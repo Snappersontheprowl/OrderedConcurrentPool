@@ -1,0 +1,14 @@
+build*/
+cmake-build-*/
+_deps/
+CMakeFiles/
+CMakeCache.txt
+CTestTestfile.cmake
+cmake_install.cmake
+Testing/
+compile_commands.json
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
