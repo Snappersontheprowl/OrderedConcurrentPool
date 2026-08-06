@@ -2,6 +2,10 @@
 
 OrderedConcurrentPool 是一个 C++17 header-only 有序并发 worker pool。
 
+当前版本：`v0.1.0`
+
+许可证：MIT
+
 它解决的问题很窄：
 
 - 固定数量 worker；
@@ -19,6 +23,7 @@ OrderedConcurrentPool 是一个 C++17 header-only 有序并发 worker pool。
 include/ocp/ordered_concurrent_pool.hpp  公开 header-only API
 tests/ordered_concurrent_pool_test.cpp   GoogleTest 契约测试
 examples/basic_batch.cpp                 最小使用示例
+benchmarks/ordered_pool_benchmark.cpp    最小 benchmark
 cmake/                                   CMake package 配置模板
 ```
 
@@ -81,6 +86,28 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+## Benchmark
+
+benchmark 默认不构建，需要显式启用：
+
+```bash
+cmake -S . -B build-benchmark \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF \
+  -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
+  -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=ON
+cmake --build build-benchmark
+./build-benchmark/ordered_concurrent_pool_benchmark
+```
+
+输出为 CSV：
+
+```text
+worker_count,job_count,latency_ms,throw_every,elapsed_ms
+```
+
+该 benchmark 只用于本机回归观察，不代表跨机器性能承诺。
 
 ## CMake 使用方式
 
@@ -146,9 +173,18 @@ target_link_libraries(your_target
 - repeated shutdown；
 - stress batch。
 
+## 发布状态
+
+`v0.1.0` 是首个本地发布版本，包含：
+
+- header-only API；
+- CMake target；
+- CMake install/export package；
+- 示例；
+- 契约测试；
+- 最小 benchmark；
+- MIT License。
+
 ## 许可证
 
-当前尚未指定开源许可证。
-
-在仓库所有者添加明确许可证前，本项目不应被视为已授权公开分发或第三方复用。
-
+本项目使用 MIT License，详见 `LICENSE`。

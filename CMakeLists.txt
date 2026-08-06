@@ -13,6 +13,7 @@ find_package(Threads REQUIRED)
 
 option(ORDERED_CONCURRENT_POOL_BUILD_TESTS "Build OrderedConcurrentPool tests" ON)
 option(ORDERED_CONCURRENT_POOL_BUILD_EXAMPLES "Build OrderedConcurrentPool examples" ON)
+option(ORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS "Build OrderedConcurrentPool benchmarks" OFF)
 
 add_library(ordered_concurrent_pool INTERFACE)
 add_library(ocp::ordered_concurrent_pool ALIAS ordered_concurrent_pool)
@@ -36,6 +37,17 @@ if(ORDERED_CONCURRENT_POOL_BUILD_EXAMPLES)
   )
 
   target_link_libraries(ordered_concurrent_pool_basic_batch
+    PRIVATE
+      ocp::ordered_concurrent_pool
+  )
+endif()
+
+if(ORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS)
+  add_executable(ordered_concurrent_pool_benchmark
+    benchmarks/ordered_pool_benchmark.cpp
+  )
+
+  target_link_libraries(ordered_concurrent_pool_benchmark
     PRIVATE
       ocp::ordered_concurrent_pool
   )
@@ -79,6 +91,14 @@ install(
 install(
   DIRECTORY include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(
+  FILES
+    LICENSE
+    README.md
+    CHANGELOG.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
 install(
