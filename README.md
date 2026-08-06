@@ -27,6 +27,7 @@ tests/ordered_concurrent_pool_test.cpp   GoogleTest 契约测试
 examples/basic_batch.cpp                 最小使用示例
 benchmarks/ordered_pool_benchmark.cpp    最小 benchmark
 cmake/                                   CMake package 配置模板
+doc/study_notes/                         项目开发规范与 CI/CD 学习笔记
 ```
 
 ## 最小示例
