@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test:
+    name: Release build and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  install-consumer:
+    name: Install package and external consumer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure library package
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF
+          -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF
+          -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
+
+      - name: Install library package
+        run: cmake --install build --prefix "${RUNNER_TEMP}/ocp-install"
+
+      - name: Verify installed files
+        run: |
+          test -f "${RUNNER_TEMP}/ocp-install/include/ocp/ordered_concurrent_pool.hpp"
+          test -f "${RUNNER_TEMP}/ocp-install/share/doc/OrderedConcurrentPool/LICENSE"
+          test -f "${RUNNER_TEMP}/ocp-install/share/doc/OrderedConcurrentPool/README.md"
+          test -f "${RUNNER_TEMP}/ocp-install/share/doc/OrderedConcurrentPool/CHANGELOG.md"
+          find "${RUNNER_TEMP}/ocp-install" -name OrderedConcurrentPoolConfig.cmake -type f | grep .
+          find "${RUNNER_TEMP}/ocp-install" -name OrderedConcurrentPoolTargets.cmake -type f | grep .
+
+      - name: Create external consumer project
+        run: |
+          mkdir -p "${RUNNER_TEMP}/ocp-consumer"
+          cat > "${RUNNER_TEMP}/ocp-consumer/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.20)
+          project(ocp_consumer LANGUAGES CXX)
+
+          find_package(OrderedConcurrentPool CONFIG REQUIRED)
+
+          add_executable(ocp_consumer main.cpp)
+          target_link_libraries(ocp_consumer PRIVATE ocp::ordered_concurrent_pool)
+          EOF
+
+          cat > "${RUNNER_TEMP}/ocp-consumer/main.cpp" <<'EOF'
+          #include <ocp/ordered_concurrent_pool.hpp>
+
+          #include <exception>
+          #include <memory>
+          #include <string>
+          #include <vector>
+
+          struct Job {
+            int value = 0;
+          };
+
+          struct Result {
+            int value = 0;
+            bool ok = false;
+            std::string message;
+          };
+
+          class Worker final : public ocp::Worker<Job, Result> {
+           public:
+            void start() override {}
+            Result run(const Job& job) override {
+              return Result{job.value * 2, true, "ok"};
+            }
+            void stop() noexcept override {}
+          };
+
+          int main() {
+            ocp::PoolOptions options;
+            options.worker_count = 2;
+
+            ocp::OrderedConcurrentPool<Job, Result> pool(
+                options,
+                [](std::size_t) {
+                  return std::unique_ptr<ocp::Worker<Job, Result>>(new Worker());
+                },
+                [](std::size_t, const Job& job, std::exception_ptr) {
+                  return Result{job.value, false, "failed"};
+                });
+
+            pool.start_all();
+            const auto results = pool.run_batch(std::vector<Job>{{1}, {2}, {3}});
+            pool.shutdown_all();
+
+            return results.size() == 3 && results[0].value == 2 &&
+                           results[1].value == 4 && results[2].value == 6
+                       ? 0
+                       : 1;
+          }
+          EOF
+
+      - name: Build and run external consumer
+        run: |
+          cmake -S "${RUNNER_TEMP}/ocp-consumer" -B "${RUNNER_TEMP}/ocp-consumer-build" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/ocp-install"
+          cmake --build "${RUNNER_TEMP}/ocp-consumer-build" --parallel
+          "${RUNNER_TEMP}/ocp-consumer-build/ocp_consumer"
+
+  sanitizer:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: AddressSanitizer
+            sanitizer: address
+            c_compiler: clang
+            cxx_compiler: clang++
+          - name: ThreadSanitizer
+            sanitizer: thread
+            c_compiler: clang
+            cxx_compiler: clang++
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-${{ matrix.sanitizer }}
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }}
+          -DCMAKE_C_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer"
+          -DCMAKE_CXX_FLAGS="-fsanitize=${{ matrix.sanitizer }} -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=${{ matrix.sanitizer }}"
+          -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF
+          -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
+
+      - name: Build
+        run: cmake --build build-${{ matrix.sanitizer }} --parallel
+
+      - name: Test
+        run: ctest --test-dir build-${{ matrix.sanitizer }} --output-on-failure

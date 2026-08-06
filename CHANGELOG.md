@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- 增加 GitHub Actions CI；
+- 增加 Release build / test 自动验证；
+- 增加 CMake install package 与外部 consumer smoke test；
+- 增加 AddressSanitizer / ThreadSanitizer 验证。
+
 ## v0.1.0 - 2026-08-06
 
 首个本地发布版本。
@@ -23,4 +30,3 @@
 - startup failure cleanup；
 - repeatable shutdown；
 - 不支持动态扩缩容、取消、优先级、retry、worker 自动重建或分布式调度。
-

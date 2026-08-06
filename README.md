@@ -1,5 +1,7 @@
 # OrderedConcurrentPool
 
+[![CI](https://github.com/Snappersontheprowl/OrderedConcurrentPool/actions/workflows/ci.yml/badge.svg)](https://github.com/Snappersontheprowl/OrderedConcurrentPool/actions/workflows/ci.yml)
+
 OrderedConcurrentPool 是一个 C++17 header-only 有序并发 worker pool。
 
 当前版本：`v0.1.0`
@@ -86,6 +88,20 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+## CI 验证
+
+GitHub Actions 会在 `main`、`v*` tag 与 pull request 上运行：
+
+- Release build + GoogleTest 契约测试；
+- CMake install package 验证；
+- 外部 CMake consumer smoke test；
+- AddressSanitizer；
+- ThreadSanitizer。
+
+其中 consumer smoke test 会先安装 `OrderedConcurrentPool`，再用临时外部项目通过
+`find_package(OrderedConcurrentPool CONFIG REQUIRED)` 和
+`ocp::ordered_concurrent_pool` 消费安装产物。
 
 ## Benchmark
 
