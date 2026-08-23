@@ -266,9 +266,8 @@ v0.1.0 -> origin/v0.1.0
 
 新增 README badge：
 
-```markdown
 [![CI](https://github.com/Snappersontheprowl/OrderedConcurrentPool/actions/workflows/ci.yml/badge.svg)](https://github.com/Snappersontheprowl/OrderedConcurrentPool/actions/workflows/ci.yml)
-```
+
 
 新增 `CHANGELOG.md` 的 `Unreleased` 记录：
 
