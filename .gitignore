@@ -7,6 +7,7 @@ CTestTestfile.cmake
 cmake_install.cmake
 Testing/
 compile_commands.json
+doc/resume/
 *.a
 *.so
 *.dylib
