@@ -3,13 +3,14 @@
 本文件用于固化本项目的人机协作规则，确保后续会话可以快速恢复一致的工作方式。
 
 ## 项目目的
-SPICEUnion 是一个 C++17 header-only 有序并发 worker pool。
+OrderedConcurrentPool 是一个 C++17 header-only 有序并发 worker pool。
 
+当前项目仅被本机 `/home/eda/my_lab/projects/SPICEUnion` 依赖。涉及 API、CMake target、安装产物或行为契约调整时，以该下游项目作为实际兼容性检查边界。
 
 ## 基本环境
 
 - 代码编辑工具：`VSCode`
-- 项目根目录：仓库根目录（本机示例：`~/my_lab/projects/SPICEUnion`）
+- 项目根目录：仓库根目录（本机示例：`~/my_lab/projects/OrderedConcurrentPool`）
 
 ## Git 与提交流程
 
