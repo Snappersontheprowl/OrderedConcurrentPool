@@ -2,6 +2,10 @@
 
 本文档用于将 `OrderedConcurrentPool` 项目整理为校招简历与面试材料。推荐根据投递岗位选择 4-6 条放入简历正文，面试时再展开后半部分。
 
+进一步的项目深挖、面试追问与自然拓展分析见：
+
+- [OrderedConcurrentPool 深挖与拓展分析笔记](deep_dive_notes.md)
+
 ## 简历正文推荐版
 
 **项目名称：OrderedConcurrentPool - C++17 Header-only 有序并发 Worker Pool**
