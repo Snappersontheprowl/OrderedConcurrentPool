@@ -85,9 +85,9 @@ int main() {
 ## 构建
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build
-ctest --test-dir build --output-on-failure
+cmake -S . -B .build/debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build .build/debug --parallel
+ctest --test-dir .build/debug --output-on-failure
 ```
 
 ## CI 验证
@@ -109,13 +109,13 @@ GitHub Actions 会在 `main`、`v*` tag 与 pull request 上运行：
 benchmark 默认不构建，需要显式启用：
 
 ```bash
-cmake -S . -B build-benchmark \
+cmake -S . -B .build/benchmark \
   -DCMAKE_BUILD_TYPE=Release \
   -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=ON
-cmake --build build-benchmark
-./build-benchmark/ordered_concurrent_pool_benchmark
+cmake --build .build/benchmark --parallel
+./.build/benchmark/ordered_concurrent_pool_benchmark
 ```
 
 输出为 CSV：

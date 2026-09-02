@@ -21,15 +21,15 @@ jobs:
 
       - name: Configure
         run: >
-          cmake -S . -B build
+          cmake -S . -B .build/ci-release
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build .build/ci-release --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir .build/ci-release --output-on-failure
 
   install-consumer:
     name: Install package and external consumer
@@ -41,14 +41,14 @@ jobs:
 
       - name: Configure library package
         run: >
-          cmake -S . -B build
+          cmake -S . -B .build/ci-install
           -DCMAKE_BUILD_TYPE=Release
           -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF
           -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF
           -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
 
       - name: Install library package
-        run: cmake --install build --prefix "${RUNNER_TEMP}/ocp-install"
+        run: cmake --install .build/ci-install --prefix "${RUNNER_TEMP}/ocp-install"
 
       - name: Verify installed files
         run: |
@@ -154,7 +154,7 @@ jobs:
 
       - name: Configure
         run: >
-          cmake -S . -B build-${{ matrix.sanitizer }}
+          cmake -S . -B .build/ci-${{ matrix.sanitizer }}
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }}
@@ -165,7 +165,7 @@ jobs:
           -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
 
       - name: Build
-        run: cmake --build build-${{ matrix.sanitizer }} --parallel
+        run: cmake --build .build/ci-${{ matrix.sanitizer }} --parallel
 
       - name: Test
-        run: ctest --test-dir build-${{ matrix.sanitizer }} --output-on-failure
+        run: ctest --test-dir .build/ci-${{ matrix.sanitizer }} --output-on-failure

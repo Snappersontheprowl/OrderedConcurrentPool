@@ -5,7 +5,8 @@
 - 增加 GitHub Actions CI；
 - 增加 Release build / test 自动验证；
 - 增加 CMake install package 与外部 consumer smoke test；
-- 增加 AddressSanitizer / ThreadSanitizer 验证。
+- 增加 AddressSanitizer / ThreadSanitizer 验证；
+- 将本地构建目录文档约定整理为 `.build/*`，避免根目录堆积临时 build 产物。
 
 ## v0.1.0 - 2026-08-06
 

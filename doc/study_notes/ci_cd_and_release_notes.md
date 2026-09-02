@@ -149,9 +149,9 @@ v0.1.0 -> f8847eb
 本地验证：
 
 ```bash
-cmake -S . -B build-release-check -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-release-check
-ctest --test-dir build-release-check --output-on-failure
+cmake -S . -B .build/release-check -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build .build/release-check --parallel
+ctest --test-dir .build/release-check --output-on-failure
 ```
 
 结果：
@@ -163,13 +163,13 @@ ctest --test-dir build-release-check --output-on-failure
 benchmark 验证：
 
 ```bash
-cmake -S . -B build-benchmark \
+cmake -S . -B .build/benchmark \
   -DCMAKE_BUILD_TYPE=Release \
   -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=ON
-cmake --build build-benchmark
-./build-benchmark/ordered_concurrent_pool_benchmark
+cmake --build .build/benchmark --parallel
+./.build/benchmark/ordered_concurrent_pool_benchmark
 ```
 
 benchmark 输出是 CSV：
@@ -183,7 +183,7 @@ worker_count,job_count,latency_ms,throw_every,elapsed_ms
 install 验证：
 
 ```bash
-cmake --install build-release-check --prefix /tmp/ocp_release_install_...
+cmake --install .build/release-check --prefix /tmp/ocp_release_install_...
 ```
 
 安装结果包含：
@@ -355,11 +355,11 @@ jobs:
 核心命令：
 
 ```bash
-cmake -S . -B build \
+cmake -S . -B .build/ci-release \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake --build .build/ci-release --parallel
+ctest --test-dir .build/ci-release --output-on-failure
 ```
 
 为什么要用 Release：
@@ -440,15 +440,15 @@ ASan 是 AddressSanitizer。
 本项目使用的配置：
 
 ```bash
-cmake -S . -B build-address \
+cmake -S . -B .build/ci-asan-clang \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
   -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
-cmake --build build-address --parallel
-ctest --test-dir build-address --output-on-failure
+cmake --build .build/ci-asan-clang --parallel
+ctest --test-dir .build/ci-asan-clang --output-on-failure
 ```
 
 ### 6.4 ThreadSanitizer
@@ -478,15 +478,15 @@ TSan 可以进一步帮助判断：
 本项目使用的配置：
 
 ```bash
-cmake -S . -B build-thread \
+cmake -S . -B .build/ci-tsan-clang \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
   -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
   -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
-cmake --build build-thread --parallel
-ctest --test-dir build-thread --output-on-failure
+cmake --build .build/ci-tsan-clang --parallel
+ctest --test-dir .build/ci-tsan-clang --output-on-failure
 ```
 
 ## 7. 为什么 sanitizer CI 用 clang
@@ -529,50 +529,50 @@ cxx_compiler: clang++
 ### 8.1 普通开发验证
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake -S . -B .build/debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build .build/debug --parallel
+ctest --test-dir .build/debug --output-on-failure
 ```
 
 ### 8.2 Release 验证
 
 ```bash
-cmake -S . -B build-ci-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-ci-release --parallel
-ctest --test-dir build-ci-release --output-on-failure
+cmake -S . -B .build/ci-release -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build .build/ci-release --parallel
+ctest --test-dir .build/ci-release --output-on-failure
 ```
 
 ### 8.3 install package 验证
 
 ```bash
-cmake -S . -B build-ci-install \
+cmake -S . -B .build/ci-install \
   -DCMAKE_BUILD_TYPE=Release \
   -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
-cmake --build build-ci-install --parallel
+cmake --build .build/ci-install --parallel
 
 ocp_install_dir=$(mktemp -d /tmp/ocp_ci_install_XXXXXX)
-cmake --install build-ci-install --prefix "$ocp_install_dir"
+cmake --install .build/ci-install --prefix "$ocp_install_dir"
 find "$ocp_install_dir" -maxdepth 6 -type f | sort
 ```
 
 ### 8.4 benchmark 验证
 
 ```bash
-cmake -S . -B build-benchmark \
+cmake -S . -B .build/benchmark \
   -DCMAKE_BUILD_TYPE=Release \
   -DORDERED_CONCURRENT_POOL_BUILD_TESTS=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=ON
-cmake --build build-benchmark --parallel
-./build-benchmark/ordered_concurrent_pool_benchmark
+cmake --build .build/benchmark --parallel
+./.build/benchmark/ordered_concurrent_pool_benchmark
 ```
 
 ### 8.5 ASan 验证
 
 ```bash
-cmake -S . -B build-ci-asan-clang \
+cmake -S . -B .build/ci-asan-clang \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
@@ -581,14 +581,14 @@ cmake -S . -B build-ci-asan-clang \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
-cmake --build build-ci-asan-clang --parallel
-ctest --test-dir build-ci-asan-clang --output-on-failure
+cmake --build .build/ci-asan-clang --parallel
+ctest --test-dir .build/ci-asan-clang --output-on-failure
 ```
 
 ### 8.6 TSan 验证
 
 ```bash
-cmake -S . -B build-ci-tsan-clang \
+cmake -S . -B .build/ci-tsan-clang \
   -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
@@ -597,8 +597,8 @@ cmake -S . -B build-ci-tsan-clang \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread" \
   -DORDERED_CONCURRENT_POOL_BUILD_EXAMPLES=OFF \
   -DORDERED_CONCURRENT_POOL_BUILD_BENCHMARKS=OFF
-cmake --build build-ci-tsan-clang --parallel
-ctest --test-dir build-ci-tsan-clang --output-on-failure
+cmake --build .build/ci-tsan-clang --parallel
+ctest --test-dir .build/ci-tsan-clang --output-on-failure
 ```
 
 ## 9. 常见概念对照
@@ -804,9 +804,9 @@ cmake/OrderedConcurrentPoolConfig.cmake.in
 你能独立跑：
 
 ```bash
-cmake -S . -B build-ci-release -DCMAKE_BUILD_TYPE=Release
-cmake --build build-ci-release --parallel
-ctest --test-dir build-ci-release --output-on-failure
+cmake -S . -B .build/ci-release -DCMAKE_BUILD_TYPE=Release
+cmake --build .build/ci-release --parallel
+ctest --test-dir .build/ci-release --output-on-failure
 ```
 
 并能解释每一行在做什么。
