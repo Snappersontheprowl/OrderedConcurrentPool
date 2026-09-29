@@ -201,6 +201,41 @@ TEST(OrderedConcurrentPoolTest, JobExceptionIsConvertedWithoutPoisoningOtherResu
   EXPECT_EQ(results[1].message, "job failed");
 }
 
+TEST(OrderedConcurrentPoolTest, ShutdownDuringBatchIsConvertedIntoFailureResults) {
+  std::vector<std::shared_ptr<WorkerState>> states;
+  ocp::OrderedConcurrentPool<Job, Result> pool(options(1), factory_with_states(&states),
+                                               failure_handler());
+  pool.start_all();
+
+  // Every job is far longer than the shutdown delay, so at most a couple of jobs can lease the
+  // single worker before the pool is stopped and the rest have to fail through the handler.
+  std::vector<Job> jobs;
+  for (int id = 0; id < 20; ++id) {
+    jobs.push_back(Job{id, 200, false});
+  }
+
+  std::thread stopper([&pool]() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    pool.shutdown_all();
+  });
+
+  std::vector<Result> results;
+  ASSERT_NO_THROW(results = pool.run_batch(jobs));
+  stopper.join();
+
+  ASSERT_EQ(results.size(), jobs.size());
+  std::size_t failures = 0;
+  for (std::size_t index = 0; index < results.size(); ++index) {
+    EXPECT_EQ(results[index].id, jobs[index].id);
+    if (!results[index].ok) {
+      ++failures;
+      EXPECT_EQ(results[index].worker_id, pool.worker_count());
+    }
+  }
+  EXPECT_GE(failures, 15U);
+  EXPECT_FALSE(pool.started());
+}
+
 TEST(OrderedConcurrentPoolTest, ShutdownIsRepeatable) {
   std::vector<std::shared_ptr<WorkerState>> states;
   ocp::OrderedConcurrentPool<Job, Result> pool(options(1), factory_with_states(&states),

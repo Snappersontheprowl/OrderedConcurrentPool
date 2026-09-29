@@ -108,6 +108,13 @@ class OrderedConcurrentPool {
     available_.notify_all();
   }
 
+  /// Runs every job concurrently and returns results with the same size and order as `jobs`.
+  ///
+  /// A job is only reported as an exception if the pool itself is misused: calling this on a pool
+  /// that was never started with a non-empty batch throws. Once a batch is accepted, every job
+  /// produces exactly one result, so a job that throws, or that cannot lease a worker because the
+  /// pool was shut down while the batch was still running, is converted through the failure
+  /// handler instead of propagating out of this call.
   std::vector<Result> run_batch(const std::vector<Job>& jobs) {
     if (jobs.empty()) {
       return {};
@@ -125,10 +132,11 @@ class OrderedConcurrentPool {
 
     for (std::size_t job_index = 0; job_index < jobs.size(); ++job_index) {
       futures.push_back(std::async(std::launch::async, [this, &jobs, &results, job_index]() {
-        const auto worker_index = acquire_worker();
-        const WorkerLease lease(*this, worker_index);
-        const auto worker_id = workers_[worker_index].id;
+        auto worker_id = unassigned_worker_id();
         try {
+          const auto worker_index = acquire_worker();
+          const WorkerLease lease(*this, worker_index);
+          worker_id = workers_[worker_index].id;
           results[job_index] = workers_[worker_index].worker->run(jobs[job_index]);
         } catch (...) {
           results[job_index] =
@@ -144,6 +152,11 @@ class OrderedConcurrentPool {
     return results;
   }
 
+  /// Stops every worker and wakes threads waiting for a worker. Repeatable.
+  ///
+  /// This does not wait for jobs that are already running. A batch that is still in flight sees
+  /// its remaining jobs converted into failure results, and `Worker::stop()` may run concurrently
+  /// with `Worker::run()` on a busy worker, which the worker implementation has to tolerate.
   void shutdown_all() noexcept {
     for (auto& worker : workers_) {
       worker.worker->stop();
@@ -163,6 +176,13 @@ class OrderedConcurrentPool {
   }
 
   std::size_t worker_count() const noexcept {
+    return workers_.size();
+  }
+
+  /// Worker id reported to the failure handler when a job never leased a worker, for example when
+  /// the pool was shut down while the batch was still running. Real worker ids are always in
+  /// [0, worker_count()), so this value can never collide with a leased worker.
+  std::size_t unassigned_worker_id() const noexcept {
     return workers_.size();
   }
 
