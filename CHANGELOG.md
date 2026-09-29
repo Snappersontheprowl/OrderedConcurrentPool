@@ -2,11 +2,22 @@
 
 ## Unreleased
 
+### 修正
+
+- 修正 `run_batch()` 在 job 未取得 worker（例如 batch 运行中另一个线程调用 `shutdown_all()`）时
+  抛出异常并丢弃整批结果的问题：这类 job 现在通过 failure handler 转换成失败结果。
+  一旦 batch 被接受，`run_batch()` 必定返回与输入等长的结果；
+- 新增 `unassigned_worker_id()`，用于标识未取得 worker 的失败结果；
+- 新增 shutdown 与在飞 batch 并发的契约测试。
+
+### 变更
+
 - 增加 GitHub Actions CI；
 - 增加 Release build / test 自动验证；
 - 增加 CMake install package 与外部 consumer smoke test；
 - 增加 AddressSanitizer / ThreadSanitizer 验证；
 - 将本地构建目录文档约定整理为 `.build/*`，避免根目录堆积临时 build 产物。
+- 补充 README 的 benchmark 参考数据、线程模型说明、契约与边界说明以及下游使用说明。
 
 ## v0.1.0 - 2026-08-06
 
