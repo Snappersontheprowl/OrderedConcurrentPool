@@ -3,6 +3,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -57,7 +58,7 @@ int main() {
   ocp::OrderedConcurrentPool<Job, Result> pool(
       options,
       [](std::size_t) { return std::unique_ptr<ocp::Worker<Job, Result>>(new DoublingWorker()); },
-      [](std::size_t, const Job& job, std::exception_ptr error) {
+      [](std::optional<std::size_t>, const Job& job, std::exception_ptr error) {
         return Result{job.value, false, exception_message(error)};
       });
 

@@ -7,6 +7,7 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <stdexcept>
 #include <utility>
@@ -34,8 +35,11 @@ class OrderedConcurrentPool {
   using WorkerType = Worker<Job, Result>;
   using WorkerPtr = std::unique_ptr<WorkerType>;
   using WorkerFactory = std::function<WorkerPtr(std::size_t worker_id)>;
-  using FailureHandler =
-      std::function<Result(std::size_t worker_id, const Job& job, std::exception_ptr error)>;
+  /// Worker id passed to the failure handler. It is std::nullopt when the job never leased a
+  /// worker, either because the pool was shut down while the batch was running or because the
+  /// execution unit for that job could not be created.
+  using FailureHandler = std::function<Result(std::optional<std::size_t> worker_id, const Job& job,
+                                              std::exception_ptr error)>;
 
   OrderedConcurrentPool(PoolOptions options, WorkerFactory factory, FailureHandler failure_handler)
       : options_(options), failure_handler_(std::move(failure_handler)) {
@@ -112,9 +116,9 @@ class OrderedConcurrentPool {
   ///
   /// A job is only reported as an exception if the pool itself is misused: calling this on a pool
   /// that was never started with a non-empty batch throws. Once a batch is accepted, every job
-  /// produces exactly one result, so a job that throws, or that cannot lease a worker because the
-  /// pool was shut down while the batch was still running, is converted through the failure
-  /// handler instead of propagating out of this call.
+  /// produces exactly one result, so a job that throws, or that never starts because it could not
+  /// lease a worker or because its execution unit could not be created, is converted through the
+  /// failure handler instead of propagating out of this call.
   std::vector<Result> run_batch(const std::vector<Job>& jobs) {
     if (jobs.empty()) {
       return {};
@@ -131,18 +135,28 @@ class OrderedConcurrentPool {
     futures.reserve(jobs.size());
 
     for (std::size_t job_index = 0; job_index < jobs.size(); ++job_index) {
-      futures.push_back(std::async(std::launch::async, [this, &jobs, &results, job_index]() {
-        auto worker_id = unassigned_worker_id();
-        try {
-          const auto worker_index = acquire_worker();
-          const WorkerLease lease(*this, worker_index);
-          worker_id = workers_[worker_index].id;
-          results[job_index] = workers_[worker_index].worker->run(jobs[job_index]);
-        } catch (...) {
-          results[job_index] =
-              failure_handler_(worker_id, jobs[job_index], std::current_exception());
-        }
-      }));
+      try {
+        // The spawn and the bookkeeping are kept apart so that "this threw" means "this job was
+        // never dispatched". If the spawn succeeded and only the push_back failed, a job that had
+        // already produced a real result would end up overwritten by a failure result.
+        auto future = std::async(std::launch::async, [this, &jobs, &results, job_index]() {
+          std::optional<std::size_t> worker_id;
+          try {
+            const auto worker_index = acquire_worker();
+            const WorkerLease lease(*this, worker_index);
+            worker_id = workers_[worker_index].id;
+            results[job_index] = workers_[worker_index].worker->run(jobs[job_index]);
+          } catch (...) {
+            results[job_index] =
+                failure_handler_(worker_id, jobs[job_index], std::current_exception());
+          }
+        });
+        // `futures` was reserved above, so this neither reallocates nor throws.
+        futures.push_back(std::move(future));
+      } catch (...) {
+        results[job_index] =
+            failure_handler_(std::nullopt, jobs[job_index], std::current_exception());
+      }
     }
 
     for (auto& future : futures) {
@@ -176,13 +190,6 @@ class OrderedConcurrentPool {
   }
 
   std::size_t worker_count() const noexcept {
-    return workers_.size();
-  }
-
-  /// Worker id reported to the failure handler when a job never leased a worker, for example when
-  /// the pool was shut down while the batch was still running. Real worker ids are always in
-  /// [0, worker_count()), so this value can never collide with a leased worker.
-  std::size_t unassigned_worker_id() const noexcept {
     return workers_.size();
   }
 

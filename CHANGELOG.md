@@ -6,12 +6,16 @@
 
 - 修正 `run_batch()` 在 job 未取得 worker（例如 batch 运行中另一个线程调用 `shutdown_all()`）时
   抛出异常并丢弃整批结果的问题：这类 job 现在通过 failure handler 转换成失败结果。
-  一旦 batch 被接受，`run_batch()` 必定返回与输入等长的结果；
-- 新增 `unassigned_worker_id()`，用于标识未取得 worker 的失败结果；
-- 新增 shutdown 与在飞 batch 并发的契约测试。
+- 修正 `std::async` 创建执行单元失败（例如线程创建失败）时同样抛出异常并丢弃整批结果的问题：
+  这类 job 视为从未派发，同样通过 failure handler 转换成失败结果。
+  综合后 `run_batch()` 一旦接受 batch 就必定返回与输入等长的结果；
+- 新增 shutdown 与在飞 batch 并发、执行单元创建失败两项契约测试。
 
 ### 变更
 
+- **破坏性变更**：`FailureHandler` 的 worker id 参数由 `std::size_t` 改为
+  `std::optional<std::size_t>`，`std::nullopt` 表示该 job 从未分配到 worker；
+  原 `unassigned_worker_id()` 哨兵接口删除，改由类型表达（下游 SPICEUnion 已同步）；
 - 增加 GitHub Actions CI；
 - 增加 Release build / test 自动验证；
 - 增加 CMake install package 与外部 consumer smoke test；

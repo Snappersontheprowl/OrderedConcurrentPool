@@ -8,19 +8,25 @@
 
 ## 暂缓池
 
-- 执行模型：`run_batch()` 为每个 job 创建一个 `std::async` 执行单元，由 available worker 队列限制
-  同时进入 `Worker::run()` 的数量。线程数随 batch 中的 job 数量增长。若下游出现大量轻量 job、
-  持续提交或 backpressure 需求，再评估改为“固定后台线程 + 任务队列”，并同步重新设计
+- 执行模型：`run_batch()` 为每个 job 创建一个 `std::async` 执行单元，由 available worker 队列限制同时进入 `Worker::run()` 的数量。线程数随 batch 中的 job 数量增长。若下游出现大量轻量 job、持续提交或 backpressure 需求，再评估改为“固定后台线程 + 任务队列”，并同步重新设计
   shutdown / drain / 取消语义。
-- `start_all()` 的启动检查与 `started_` 置位不在同一临界区，不支持并发调用。若后续需要并发启动，
-  再引入显式状态机收敛。
+- `start_all()` 的启动检查与 `started_` 置位不在同一临界区，不支持并发调用。若后续需要并发启动，再引入显式状态机收敛。
 - worker 线程亲和：job 在任意执行单元上运行，worker 不绑定固定线程。若下游 session 依赖
   thread_local 或要求同线程复用，再增加固定线程模式。
 
 ## 监控项
 
-- 下游 SPICEUnion 的批量规模：job 数是否长期显著大于 worker 数，决定上面第一条的紧迫性。
+- 下游 SPICEUnion 的批量规模：MC 一次可能提交几十万个 job（N 远大于 worker 数）。
+  但下游 work dir 按 worker 分配、结果需在整批返回后读取，可能隐含"单批 ≤ worker_count"约束；
+  该约束是否成立决定上面第一条（队列化）的紧迫性。验证方法见
+  `doc/resume/并发机制复盘.md` 第 4.2 节。
 
 ## 归档
 
-无。
+- 2026-10-03：执行单元创建失败兜底 + failure handler worker id 契约收敛。
+  内容：`std::async` 抛出纳入 failure handler；worker id 参数由 `std::size_t` 改为
+  `std::optional<std::size_t>`，删除 `unassigned_worker_id()` 哨兵接口。
+  已同步：header、契约测试、example、benchmark、README、CHANGELOG、CI consumer 代码、
+  下游 SPICEUnion 的 `SimulatorPool` handler 与其契约测试副本。
+  验证：OCP ctest 10/10、TSan/ASan 各 10/10 无告警、CI consumer 流程本地复现通过、
+  SPICEUnion ctest 104/104。复盘笔记见 `doc/resume/并发机制复盘.md` 第 3 节。

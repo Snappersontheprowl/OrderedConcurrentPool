@@ -14,7 +14,7 @@ OrderedConcurrentPool 是一个 C++17 header-only 有序并发 worker pool。
 - batch job 并发执行；
 - 输出结果严格保持输入顺序；
 - 单个 job 异常由调用方转换成失败结果；
-- batch 运行中被 `shutdown_all()` 打断时，未取得 worker 的 job 同样由调用方转换成失败结果；
+- batch 运行中被 `shutdown_all()` 打断、或执行单元创建失败的 job，同样由调用方转换成失败结果；
 - worker startup 失败时清理已启动 worker；
 - `shutdown_all()` 可重复调用。
 
@@ -38,6 +38,7 @@ doc/study_notes/                         项目开发规范与 CI/CD 学习笔�
 
 #include <exception>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -69,7 +70,7 @@ int main() {
       [](std::size_t) {
         return std::unique_ptr<ocp::Worker<Job, Result>>(new Worker());
       },
-      [](std::size_t, const Job& job, std::exception_ptr) {
+      [](std::optional<std::size_t>, const Job& job, std::exception_ptr) {
         return Result{job.value, false, "failed"};
       });
 
@@ -211,11 +212,12 @@ target_link_libraries(your_target
   再用每个 job 的结果覆盖对应槽位。
 - 必须先 `start_all()` 再 `run_batch()`。对未启动的 pool 调用非空 batch 会抛 `std::runtime_error`；
   空 batch 直接返回空结果，不做启动检查。
-- 一旦 batch 被接受，`run_batch()` 必定返回与输入等长的结果：单个 job 抛异常、或 job 始终没有取得
-  worker（例如 batch 运行中另一个线程调用了 `shutdown_all()`），都会通过 failure handler 转换成失败
-  结果，而不是抛出。
-- 未取得 worker 的失败结果，其 worker id 为 `unassigned_worker_id()`，即 `worker_count()`。
-  真实 worker id 一定落在 `[0, worker_count())`，因此两者不会混淆。
+- 一旦 batch 被接受，`run_batch()` 必定返回与输入等长的结果：单个 job 抛异常、job 始终没有取得
+  worker（例如 batch 运行中另一个线程调用了 `shutdown_all()`）、或 job 的执行单元创建失败
+  （线程创建失败等环境问题），都会通过 failure handler 转换成失败结果，而不是抛出。
+- failure handler 接收的 worker id 是 `std::optional<std::size_t>`：`std::nullopt` 表示该 job
+  从未分配到 worker（没取得 worker，或根本没被派发出去）；有值时一定是 `[0, worker_count())`
+  内的真实 id。
 - failure handler 不应抛异常：它抛出的异常会逃出 `run_batch()`。
 
 pool 自身的边界：

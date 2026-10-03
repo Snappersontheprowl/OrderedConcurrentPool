@@ -6,10 +6,16 @@
 #include <chrono>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <vector>
+
+#if defined(__linux__)
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -21,7 +27,7 @@ struct Job {
 
 struct Result {
   int id = -1;
-  std::size_t worker_id = 0;
+  std::optional<std::size_t> worker_id;
   bool ok = false;
   std::string message;
 };
@@ -72,7 +78,7 @@ ocp::PoolOptions options(std::size_t worker_count = 2) {
 }
 
 auto failure_handler() {
-  return [](std::size_t worker_id, const Job& job, std::exception_ptr error) {
+  return [](std::optional<std::size_t> worker_id, const Job& job, std::exception_ptr error) {
     std::string message = "unknown";
     try {
       if (error) {
@@ -229,11 +235,86 @@ TEST(OrderedConcurrentPoolTest, ShutdownDuringBatchIsConvertedIntoFailureResults
     EXPECT_EQ(results[index].id, jobs[index].id);
     if (!results[index].ok) {
       ++failures;
-      EXPECT_EQ(results[index].worker_id, pool.worker_count());
+      EXPECT_FALSE(results[index].worker_id.has_value());
     }
   }
   EXPECT_GE(failures, 15U);
   EXPECT_FALSE(pool.started());
+}
+
+#if defined(__linux__)
+
+// 临时把本进程的线程数上限压到 `limit`，用来构造“执行单元创建失败”的场景。
+// 析构时恢复原值；RLIMIT_NPROC 是进程级设置，不影响其它进程。
+class ProcessThreadLimitGuard {
+ public:
+  explicit ProcessThreadLimitGuard(rlim_t limit) noexcept {
+    if (::getrlimit(RLIMIT_NPROC, &original_) != 0) {
+      return;
+    }
+    struct rlimit lowered = original_;
+    lowered.rlim_cur = limit;
+    active_ = ::setrlimit(RLIMIT_NPROC, &lowered) == 0;
+  }
+
+  ~ProcessThreadLimitGuard() {
+    if (active_) {
+      ::setrlimit(RLIMIT_NPROC, &original_);
+    }
+  }
+
+  ProcessThreadLimitGuard(const ProcessThreadLimitGuard&) = delete;
+  ProcessThreadLimitGuard& operator=(const ProcessThreadLimitGuard&) = delete;
+
+  bool active() const noexcept {
+    return active_;
+  }
+
+ private:
+  struct rlimit original_ {};
+  bool active_ = false;
+};
+
+// root 用户下内核会跳过 RLIMIT_NPROC 检查，所以必须先确认限制真的生效。
+bool thread_creation_is_blocked() {
+  try {
+    std::thread probe([] {});
+    probe.join();
+  } catch (const std::system_error&) {
+    return true;
+  }
+  return false;
+}
+
+#endif  // defined(__linux__)
+
+TEST(OrderedConcurrentPoolTest, DispatchFailureIsConvertedIntoFailureResults) {
+#if !defined(__linux__)
+  GTEST_SKIP() << "RLIMIT_NPROC is only enforced on Linux";
+#else
+  std::vector<std::shared_ptr<WorkerState>> states;
+  ocp::OrderedConcurrentPool<Job, Result> pool(options(2), factory_with_states(&states),
+                                               failure_handler());
+  pool.start_all();
+
+  // 池子已经启动；把线程上限压到 0 之后，每次 std::async 都无法创建执行单元。
+  ProcessThreadLimitGuard limit(0);
+  if (!limit.active() || !thread_creation_is_blocked()) {
+    GTEST_SKIP() << "RLIMIT_NPROC is not enforced in this environment";
+  }
+
+  std::vector<Result> results;
+  ASSERT_NO_THROW(results =
+                      pool.run_batch({Job{1, 0, false}, Job{2, 0, false}, Job{3, 0, false}}));
+
+  ASSERT_EQ(results.size(), 3U);
+  for (std::size_t index = 0; index < results.size(); ++index) {
+    EXPECT_EQ(results[index].id, static_cast<int>(index) + 1);
+    EXPECT_FALSE(results[index].ok);
+    EXPECT_FALSE(results[index].worker_id.has_value());
+    EXPECT_FALSE(results[index].message.empty());
+  }
+#endif
 }
 
 TEST(OrderedConcurrentPoolTest, ShutdownIsRepeatable) {

@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -64,7 +65,9 @@ double run_scenario(const Scenario& scenario) {
   ocp::OrderedConcurrentPool<Job, Result> pool(
       options,
       [](std::size_t) { return std::unique_ptr<ocp::Worker<Job, Result>>(new BenchmarkWorker()); },
-      [](std::size_t, const Job& job, std::exception_ptr) { return Result{job.id, false}; });
+      [](std::optional<std::size_t>, const Job& job, std::exception_ptr) {
+        return Result{job.id, false};
+      });
 
   const auto jobs = make_jobs(scenario);
   const auto start = std::chrono::steady_clock::now();

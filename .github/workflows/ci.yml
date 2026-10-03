@@ -77,6 +77,7 @@ jobs:
 
           #include <exception>
           #include <memory>
+          #include <optional>
           #include <string>
           #include <vector>
 
@@ -108,7 +109,7 @@ jobs:
                 [](std::size_t) {
                   return std::unique_ptr<ocp::Worker<Job, Result>>(new Worker());
                 },
-                [](std::size_t, const Job& job, std::exception_ptr) {
+                [](std::optional<std::size_t>, const Job& job, std::exception_ptr) {
                   return Result{job.value, false, "failed"};
                 });
 
